@@ -242,7 +242,8 @@ bool RemoteChunkStore::Store(const ChunkId& name,
 
   bool store_done=false;
   OpFunctor local_callback=[&](bool applied){
-      callback(applied);
+      if(callback)
+          callback(applied);
       std::lock_guard<std::mutex> lock(mutex_);
       store_done=true;
   };
@@ -281,7 +282,8 @@ bool RemoteChunkStore::Delete(const ChunkId& name,
 
   bool delete_done=false;
   OpFunctor local_callback=[&](bool applied){
-      callback(applied);
+      if(callback)
+          callback(applied);
       std::lock_guard<std::mutex> lock(mutex_);
       delete_done=true;
   };
@@ -320,7 +322,8 @@ bool RemoteChunkStore::Modify(const ChunkId& name,
   std::unique_lock<std::mutex> lock(mutex_);
   bool modify_done=false;
   OpFunctor local_callback=[&](bool applied){
-      callback(applied);
+      if(callback)
+          callback(applied);
       std::lock_guard<std::mutex> lock(mutex_);
       modify_done=true;
   };
