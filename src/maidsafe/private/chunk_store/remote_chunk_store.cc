@@ -278,7 +278,14 @@ bool RemoteChunkStore::Delete(const ChunkId& name,
   LOG(kInfo) << "Delete - " << Base32Substr(name);
 
   std::unique_lock<std::mutex> lock(mutex_);
-  uint32_t id(EnqueueOp(name, OperationData(OpType::kDelete, callback, fob, false, false), lock));
+
+  bool delete_done=false;
+  OpFunctor local_callback=[&](bool applied){
+      callback(applied);
+      std::lock_guard<std::mutex> lock(mutex_);
+      delete_done=true;
+  };
+  uint32_t id(EnqueueOp(name, OperationData(OpType::kDelete, local_callback, fob, false, false), lock));
   WaitResult result(WaitForConflictingOps(name, OpType::kDelete, id, lock));
   if (result != WaitResult::kSuccess) {
     LOG(kWarning) << "Delete - Terminated early for " << Base32Substr(name);
@@ -293,7 +300,9 @@ bool RemoteChunkStore::Delete(const ChunkId& name,
   if (it != pending_ops_.right.end())
     it->info.ready = true;
 
-  ProcessPendingOps(lock);
+  while(!delete_done){
+      ProcessPendingOps(lock);
+  }
   return true;
 }
 
@@ -309,7 +318,13 @@ bool RemoteChunkStore::Modify(const ChunkId& name,
   }
 
   std::unique_lock<std::mutex> lock(mutex_);
-  OperationData op_data(OpType::kModify, callback, fob, true, false);
+  bool modify_done=false;
+  OpFunctor local_callback=[&](bool applied){
+      callback(applied);
+      std::lock_guard<std::mutex> lock(mutex_);
+      modify_done=true;
+  };
+  OperationData op_data(OpType::kModify, local_callback, fob, true, false);
   op_data.content = content;
   EnqueueOp(name, op_data, lock);
 //   uint32_t id(EnqueueOp(name, op_data, &lock));
@@ -319,7 +334,8 @@ bool RemoteChunkStore::Modify(const ChunkId& name,
 //     return result == kWaitCancelled;
 //   }
 
-  ProcessPendingOps(lock);
+  while(!modify_done)
+      ProcessPendingOps(lock);
   return true;
 }
 
