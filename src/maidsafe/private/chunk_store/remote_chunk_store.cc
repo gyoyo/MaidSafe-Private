@@ -239,7 +239,15 @@ bool RemoteChunkStore::Store(const ChunkId& name,
   LOG(kInfo) << "Store - " << Base32Substr(name);
 
   std::unique_lock<std::mutex> lock(mutex_);
-  uint32_t id(EnqueueOp(name, OperationData(OpType::kStore, callback, fob, false, false), lock));
+
+  bool store_done=false;
+  OpFunctor local_callback=[&](bool applied){
+      callback(applied);
+      std::lock_guard<std::mutex> lock(mutex_);
+      store_done=true;
+  };
+      
+  uint32_t id(EnqueueOp(name, OperationData(OpType::kStore, local_callback, fob, false, false), lock));
   WaitResult result(WaitForConflictingOps(name, OpType::kStore, id, lock));
   if (result != WaitResult::kSuccess) {
     LOG(kWarning) << "Store - Terminated early for " << Base32Substr(name);
@@ -258,7 +266,9 @@ bool RemoteChunkStore::Store(const ChunkId& name,
   if (it != pending_ops_.right.end())
     it->info.ready = true;
 
-  ProcessPendingOps(lock);
+  while(!store_done){
+      ProcessPendingOps(lock);
+  }
   return true;
 }
 
