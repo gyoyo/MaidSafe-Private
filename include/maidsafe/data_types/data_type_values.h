@@ -16,87 +16,30 @@
 #include <ostream>
 #include <string>
 
+#include "maidsafe/data_types/macros.h"
+
 
 namespace maidsafe {
 
-enum class DataTagValue : int32_t {
-  kAnmidValue,
-  kAnsmidValue,
-  kAntmidValue,
-  kAnmaidValue,
-  kMaidValue,
-  kPmidValue,
-  kMidValue,
-  kSmidValue,
-  kTmidValue,
-  kAnmpidValue,
-  kMpidValue,
-  kImmutableDataValue,
-  kOwnerDirectoryValue,
-  kGroupDirectoryValue,
-  kWorldDirectoryValue
-};
+#define MAIDSAFE_DATA_TYPES                                                                        \
+    (Anmid, passport::PublicAnmid)                                                                 \
+    (Ansmid, passport::PublicAnsmid)                                                               \
+    (Antmid, passport::PublicAntmid)                                                               \
+    (Anmaid, passport::PublicAnmaid)                                                               \
+    (Maid, passport::PublicMaid)                                                                   \
+    (Pmid, passport::PublicPmid)                                                                   \
+    (Mid, passport::Mid)                                                                           \
+    (Smid, passport::Smid)                                                                         \
+    (Tmid, passport::Tmid)                                                                         \
+    (Anmpid, passport::PublicAnmpid)                                                               \
+    (Mpid, passport::PublicMpid)                                                                   \
+    (ImmutableData, ImmutableData)                                                                 \
+    (OwnerDirectory, OwnerDirectory)                                                               \
+    (GroupDirectory, GroupDirectory)                                                               \
+    (WorldDirectory, WorldDirectory)
 
+DEFINE_MAIDSAFE_DATA_TYPES_ENUM_VALUES(DataTagValue, int32_t)
 
-template <typename Elem, typename Traits>
-std::basic_ostream<Elem, Traits>& operator<<(std::basic_ostream<Elem, Traits>& ostream,
-                                             const DataTagValue &data_type) {
-  std::string data_type_str;
-  switch (data_type) {
-    case DataTagValue::kAnmidValue:
-      data_type_str = "ANMID";
-      break;
-    case DataTagValue::kAnsmidValue:
-      data_type_str = "ANSMID";
-      break;
-    case DataTagValue::kAntmidValue:
-      data_type_str = "ANTMID";
-      break;
-    case DataTagValue::kAnmaidValue:
-      data_type_str = "ANMAID";
-      break;
-    case DataTagValue::kMaidValue:
-      data_type_str = "MAID";
-      break;
-    case DataTagValue::kPmidValue:
-      data_type_str = "PMID";
-      break;
-    case DataTagValue::kMidValue:
-      data_type_str = "MID";
-      break;
-    case DataTagValue::kSmidValue:
-      data_type_str = "SMID";
-      break;
-    case DataTagValue::kTmidValue:
-      data_type_str = "TMID";
-      break;
-    case DataTagValue::kAnmpidValue:
-      data_type_str = "ANMPID";
-      break;
-    case DataTagValue::kMpidValue:
-      data_type_str = "MPID";
-      break;
-    case DataTagValue::kImmutableDataValue:
-      data_type_str = "Immutable Data";
-      break;
-    case DataTagValue::kOwnerDirectoryValue:
-      data_type_str = "Owner Directory";
-      break;
-    case DataTagValue::kGroupDirectoryValue:
-      data_type_str = "Group Directory";
-      break;
-    case DataTagValue::kWorldDirectoryValue:
-      data_type_str = "World Directory";
-      break;
-    default:
-      data_type_str = "Invalid data type";
-      break;
-  }
-
-  for (std::string::iterator itr(data_type_str.begin()); itr != data_type_str.end(); ++itr)
-    ostream << ostream.widen(*itr);
-  return ostream;
-}
 
 }  // namespace maidsafe
 

@@ -34,6 +34,25 @@ TEST(DataTypesTest, BEH_ConstructType) {
   static_assert(is_long_term_cacheable<ImmutableData>::value, "");
 }
 
+TEST(DataTypesTest, BEH_OutputOperator) {
+  LOG(kInfo) << DataTagValue::kAnmidValue;
+  LOG(kInfo) << DataTagValue::kAnsmidValue;
+  LOG(kInfo) << DataTagValue::kAntmidValue;
+  LOG(kInfo) << DataTagValue::kAnmaidValue;
+  LOG(kInfo) << DataTagValue::kMaidValue;
+  LOG(kInfo) << DataTagValue::kPmidValue;
+  LOG(kInfo) << DataTagValue::kMidValue;
+  LOG(kInfo) << DataTagValue::kSmidValue;
+  LOG(kInfo) << DataTagValue::kTmidValue;
+  LOG(kInfo) << DataTagValue::kAnmpidValue;
+  LOG(kInfo) << DataTagValue::kMpidValue;
+  LOG(kInfo) << DataTagValue::kImmutableDataValue;
+  LOG(kInfo) << DataTagValue::kOwnerDirectoryValue;
+  LOG(kInfo) << DataTagValue::kGroupDirectoryValue;
+  LOG(kInfo) << DataTagValue::kWorldDirectoryValue;
+  LOG(kInfo) << static_cast<DataTagValue>(-9);
+}
+
 TEST(DataTypesTest, BEH_RetrieveType) {
   Identity id(RandomString(64));
 
@@ -42,6 +61,7 @@ TEST(DataTypesTest, BEH_RetrieveType) {
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kAnsmidValue>::value);
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kAntmidValue>::value);
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kAnmaidValue>::value);
+  ASSERT_TRUE(is_maidsafe_data<DataTagValue::kMaidValue>::value);
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kPmidValue>::value);
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kMidValue>::value);
   ASSERT_TRUE(is_maidsafe_data<DataTagValue::kSmidValue>::value);
