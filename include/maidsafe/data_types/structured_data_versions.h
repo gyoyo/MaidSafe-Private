@@ -194,12 +194,12 @@ class StructuredDataVersions {
   void BranchToProtobuf(VersionsItr itr,
                         protobuf::StructuredDataVersions& proto_versions,
                         protobuf::StructuredDataVersions_Branch* proto_branch) const;
+  void ApplyBranch(VersionName parent, VersionsItr itr, StructuredDataVersions& new_versions) const;
   VersionName ParentName(VersionsItr itr) const;
   VersionName ParentName(Versions::const_iterator itr) const;
   VersionName RootParentName() const;
   bool NewVersionPreExists(const VersionName& old_version, const VersionName& new_version) const;
-  void CheckForUnorphaning(const VersionName& old_version,
-                           Version& version,
+  void CheckForUnorphaning(Version& version,
                            OrphansRange& orphans_range,
                            bool& unorphans_existing_root) const;
   std::future<void> CheckVersionNotInBranch(VersionsItr itr, const VersionName& version) const;
@@ -215,6 +215,7 @@ class StructuredDataVersions {
               OrphansRange orphans_range,
               bool erase_existing_root);
   void SetVersionAsChildOfItsParent(VersionsItr versions_itr);
+  void UnorphanRoot(VersionsItr parent, bool is_root_or_orphan, const VersionName& old_version);
   void Unorphan(VersionsItr parent, OrphansRange orphans_range);
   void ReplaceRoot();
   void ReplaceRootFromOrphans();

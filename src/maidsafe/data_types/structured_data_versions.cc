@@ -290,7 +290,28 @@ void StructuredDataVersions::BranchToProtobuf(
 
 void StructuredDataVersions::ApplySerialised(const serialised_type& serialised_data_versions) {
   StructuredDataVersions new_info(serialised_data_versions);
+  ApplyBranch(root_.first, root_.second, new_info);
+  for (const auto& orphan : orphans_)
+    ApplyBranch(orphan.first, orphan.second, new_info);
+  swap(*this, new_info);
+}
 
+void StructuredDataVersions::ApplyBranch(VersionName parent,
+                                         VersionsItr itr,
+                                         StructuredDataVersions& new_versions) const {
+  for (;;) {
+    new_versions.Put(parent, itr->first);
+    if (itr->second->children.empty())
+      return;
+    parent = itr->first;
+    if (itr->second->children.size() == 1U) {
+      itr = itr->second->children.front();
+    } else {
+      for (auto child : itr->second->children)
+        ApplyBranch(parent, child, new_versions);
+      return;
+    }
+  }
 }
 
 void StructuredDataVersions::Put(const VersionName& old_version, const VersionName& new_version) {
@@ -298,7 +319,7 @@ void StructuredDataVersions::Put(const VersionName& old_version, const VersionNa
     return;
 
   // Check we've not been asked to store two roots.
-  bool is_root(!old_version.id->IsInitialised());
+  bool is_root(!old_version.id->IsInitialised() || versions_.empty());
   if (is_root && root_.second != std::end(versions_) && !RootParentName().id->IsInitialised())
     ThrowError(CommonErrors::invalid_parameter);
 
@@ -308,7 +329,7 @@ void StructuredDataVersions::Put(const VersionName& old_version, const VersionNa
   bool is_orphan(version.second->parent == std::end(versions_) && !is_root);
   OrphansRange orphans_range;
   bool unorphans_existing_root(false);
-  CheckForUnorphaning(old_version, version, orphans_range, unorphans_existing_root);
+  CheckForUnorphaning(version, orphans_range, unorphans_existing_root);
   auto unorphaned_count(std::distance(orphans_range.first, orphans_range.second));
 
   // Handle case where we're about to exceed 'max_versions_'.
@@ -346,18 +367,34 @@ bool StructuredDataVersions::NewVersionPreExists(const VersionName& old_version,
                                                  const VersionName& new_version) const {
   auto existing_itr(versions_.find(new_version));
   if (existing_itr != std::end(versions_)) {
-    if (existing_itr->second->parent != std::end(versions_) &&
-        ParentName(existing_itr) == old_version) {
-      return true;
-    } else {
+    if (existing_itr->second->parent == std::end(versions_)) {
+      // This is root or an orphan
+      if (new_version == root_.second->first) {
+        if (root_.first == old_version)
+          return true;
+        ThrowError(CommonErrors::invalid_parameter);
+      }
+
+      auto orphan_itr(std::find_if(std::begin(orphans_),
+                                   std::end(orphans_),
+                                   [existing_itr](Orphans::value_type orphan) {
+                                      return orphan.second == existing_itr;
+                                   }));
+      assert(orphan_itr != std::end(orphans_));
+      if (orphan_itr != std::end(orphans_) && orphan_itr->first == old_version)
+        return true;
       ThrowError(CommonErrors::invalid_parameter);
+    } else {
+      if (ParentName(existing_itr) == old_version)
+        return true;
+      else
+        ThrowError(CommonErrors::invalid_parameter);
     }
   }
   return false;
 }
 
-void StructuredDataVersions::CheckForUnorphaning(const VersionName& old_version,
-                                                 Version& version,
+void StructuredDataVersions::CheckForUnorphaning(Version& version,
                                                  OrphansRange& orphans_range,
                                                  bool& unorphans_existing_root) const {
   orphans_range = orphans_.equal_range(version.first);
@@ -367,9 +404,11 @@ void StructuredDataVersions::CheckForUnorphaning(const VersionName& old_version,
     check_futures.push_back(CheckVersionNotInBranch(orphan_itr->second, version.first));
     version.second->children.emplace_back(orphan_itr->second);
   }
-  unorphans_existing_root = (root_.first.id->IsInitialised() && RootParentName() == old_version);
-  assert(!(std::distance(orphans_range.first, orphans_range.second) != 0 &&
-           unorphans_existing_root));
+  unorphans_existing_root = (root_.first.id->IsInitialised() && RootParentName() == version.first);
+  if (unorphans_existing_root) {
+    check_futures.push_back(CheckVersionNotInBranch(root_.second, version.first));
+    version.second->children.emplace_back(root_.second);
+  }
   for (auto& check_future : check_futures)
     check_future.get();
 }
@@ -419,28 +458,34 @@ void StructuredDataVersions::Insert(const Version& version,
                                     bool unorphans_existing_root,
                                     OrphansRange orphans_range,
                                     bool erase_existing_root) {
+  assert(!((is_root || unorphans_existing_root) && erase_existing_root));
+
   auto inserted_itr(versions_.insert(version).first);
+  // Perform Unorphan before modifying the 'orphans_' container.  While inserting won't invalidate
+  // the 'orphans_range' iterators, the inserted item could fall between the iterators and would
+  // be removed by a subsequent Unorphan call.
+  Unorphan(inserted_itr, orphans_range);
 
   if (!is_root && !is_orphan)
     SetVersionAsChildOfItsParent(inserted_itr);
 
-  if (is_orphan)
+  if (is_orphan && !unorphans_existing_root)
     orphans_.insert(std::make_pair(old_version, inserted_itr));
 
-  if (is_root) {
-    assert(!erase_existing_root);
-    root_ = std::make_pair(old_version, inserted_itr);
-    Unorphan(inserted_itr, orphans_range);
-  } else if (unorphans_existing_root) {
-    assert(!erase_existing_root);
-    root_.second->second->parent = inserted_itr;
-    root_ = std::make_pair(old_version, inserted_itr);
-  } else {
-    Unorphan(inserted_itr, orphans_range);
+  if (is_root && root_.first.id->IsInitialised() && !unorphans_existing_root) {
+    // The new root is replacing a temporary old root which would have been an orphan had the real
+    // root existed at that time.  Move the old root to 'orphans_'.
+    orphans_.insert(root_);
   }
 
-  if (erase_existing_root) {
-    assert(!unorphans_existing_root && !is_root);
+  if (is_root) {
+    if (unorphans_existing_root)
+      UnorphanRoot(inserted_itr, true, old_version);
+    else
+      root_ = std::make_pair(old_version, inserted_itr);
+  } else if (unorphans_existing_root) {
+    UnorphanRoot(inserted_itr, is_orphan, old_version);
+  } else if (erase_existing_root) {
     ReplaceRoot();
   }
 
@@ -462,6 +507,28 @@ void StructuredDataVersions::SetVersionAsChildOfItsParent(VersionsItr versions_i
     tips_of_trees_.erase(tip_of_tree_itr);
   }
   parents_children.push_back(versions_itr);
+}
+
+void StructuredDataVersions::UnorphanRoot(VersionsItr parent,
+                                          bool is_root_or_orphan,
+                                          const VersionName& old_version) {
+  root_.second->second->parent = parent;
+  if (is_root_or_orphan) {
+    root_ = std::make_pair(old_version, parent);
+  } else {
+    // Find the start of the current branch - must be an orphan.
+    auto new_root(parent);
+    while (new_root->second->parent != std::end(versions_))
+      new_root = new_root->second->parent;
+    auto orphan_itr(std::find_if(std::begin(orphans_), std::end(orphans_),
+        [new_root](Orphans::value_type orphan) { return orphan.second == new_root; }));
+    assert(orphan_itr != std::end(orphans_));
+    if (orphan_itr == std::end(orphans_))
+      ThrowError(CommonErrors::unknown);
+    // Move from orphans to root_
+    root_ = *orphan_itr;
+    orphans_.erase(orphan_itr);
+  }
 }
 
 void StructuredDataVersions::Unorphan(VersionsItr parent, OrphansRange orphans_range) {
