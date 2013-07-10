@@ -88,6 +88,10 @@ class DataBuffer {
   // Throws if max_memory_usage_ > max_disk_usage.
   void SetMaxDiskUsage(DiskUsage max_disk_usage);
 
+  const boost::filesystem::path StoragePath() {
+    return kDiskBuffer_;
+  }
+
   friend class test::DataBufferTest;
   template<typename StoragePolicy> friend class test::DataStoreTest;
 
