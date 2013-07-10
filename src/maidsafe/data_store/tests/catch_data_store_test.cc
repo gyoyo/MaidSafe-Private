@@ -73,7 +73,7 @@ const uint64_t OneKB(1024);
 }
 
 TEST_CASE("CatchDataStoreTest", "Constructor") {
-  TEST_TYPE("DataStore", "Paramater DataBuffer", DataBuffer);     
+  TEST_TYPE("DataStore", "Parameter DataBuffer", DataBuffer);
 }
 
 
