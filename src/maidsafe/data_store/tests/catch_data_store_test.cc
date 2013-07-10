@@ -53,7 +53,7 @@ const uint64_t OneKB(1024);
     REQUIRE_THROWS(DataStore<T>(MemoryUsage(2), DiskUsage(1), pop_functor));\
     REQUIRE_THROWS(DataStore<T>(MemoryUsage(200001), DiskUsage(200000), pop_functor));\
     REQUIRE_NOTHROW(DataStore<T>(MemoryUsage(199999), DiskUsage(200000), pop_functor));\
-    boost::filesystem::path test_path("C:\\Users\\User\\AppData\\Local\\Temp\\MaidSafe_Test_DataBuffer");\
+    boost::filesystem::path test_path(GetUserAppDir() / "MaidSafe_Test_DataBuffer");\
     boost::filesystem::create_directories(test_path);\
     CHECK(fs::exists(test_path));\
     boost::filesystem::path file_path(test_path / "File");\
